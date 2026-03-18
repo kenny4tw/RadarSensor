@@ -1,4 +1,5 @@
-# Acconeer XE125 – Water Surface Velocity
+# Acconeer XE125 – Water Surface Velocity & Distance
 # Install with: pip install -r requirements.txt
 
 acconeer-exptool>=7.0.0
+scipy
