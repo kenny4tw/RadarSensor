@@ -917,6 +917,13 @@ def start_sensor(sensor_id: str) -> Any:
         use_remote = (control_mode == "remote") or (control_mode == "auto" and not _is_local_host(host))
 
         if use_remote:
+            # Stop first if already running (gives the Pi time to release the sensor before restarting in a new mode)
+            try:
+                stop_result = _remote_control(sensor, "stop")
+                _debug_log(f"*** REMOTE STOP (pre-start) for {sensor_id}: {stop_result}")
+                time.sleep(2.0)
+            except Exception as stop_exc:
+                _debug_log(f"*** REMOTE STOP (pre-start) failed for {sensor_id}: {stop_exc} — continuing")
             result = _remote_control(sensor, "start")
             _debug_log(f"*** REMOTE START for {sensor_id}: {result}")
         else:
