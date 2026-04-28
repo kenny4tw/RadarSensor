@@ -1,0 +1,40 @@
+[Unit]
+Description=Radar Sensor Daemon for Water Velocity Measurement
+After=network-online.target
+Wants=network-online.target
+Documentation=file:///home/pi/WaterVelocityMeassure/RASPBERRY_PI_SETUP.md
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/WaterVelocityMeassure
+ExecStart=/home/pi/WaterVelocityMeassure/run_radar_daemon_rpi.sh
+
+# Restart policy
+Restart=on-failure
+RestartSec=10
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=radar-daemon
+
+# Environment
+Environment="PYTHONUNBUFFERED=1"
+Environment="PYTHONDONTWRITEBYTECODE=1"
+
+# Resource limits (Pi 3 optimization)
+MemoryLimit=256M
+TasksMax=16
+
+# Security
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/log/radar_daemon
+
+[Install]
+WantedBy=multi-user.target
