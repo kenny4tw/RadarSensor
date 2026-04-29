@@ -1,0 +1,24 @@
+{
+  "sensors": [
+    {
+      "id": "sensor1",
+      "name": "Sensor 1",
+      "host": "192.168.1.XXX",
+      "mode": "velocity",
+      "port": "COM9",
+      "netvar_port": 8080,
+      "control_mode": "remote",
+      "remote_sensor_id": "sensor1",
+      "surface_distance": 2.3,
+      "angle": 45.0,
+      "hwaas": 16,
+      "sweeps": 128,
+      "time_series": 512,
+      "lp_coeff": 0.75,
+      "cfar_sensitivity": 0.5,
+      "max_peak_interval": 1.0,
+      "slow_zone": 3,
+      "auto_start": false
+    }
+  ]
+}
