@@ -250,7 +250,7 @@ class RadarDaemon:
                 target=self._measurement_loop,
                 args=(sensor_id,),
                 name=f"measure-{sensor_id}",
-                daemon=False
+                daemon=True
             )
             thread.start()
             self.measurement_threads[sensor_id] = thread
@@ -281,7 +281,7 @@ class RadarDaemon:
             logger.info(f"Waiting for {sensor_id} thread to finish...")
             thread.join(timeout=5)
             if thread.is_alive():
-                logger.warning(f"Thread {sensor_id} did not finish gracefully")
+                logger.warning(f"Thread {sensor_id} did not finish gracefully within timeout")
         
         # Stop API server
         if self.api_server:
@@ -295,7 +295,9 @@ class RadarDaemon:
                 logger.info(f"Closed log file for {sensor_id}")
         
         logger.info("Daemon stopped")
-        sys.exit(0)
+        # Use os._exit to force-terminate even if any thread is still blocked
+        # (e.g. get_next() stuck on a disconnected sensor)
+        os._exit(0)
     
     def _start_api_server(self) -> None:
         """Start JSON API server."""
@@ -408,7 +410,7 @@ class RadarDaemon:
             target=self._measurement_loop,
             args=(sid,),
             name=f"measure-{sid}",
-            daemon=False,
+            daemon=True,
         )
         thread.start()
         self.measurement_threads[sid] = thread
