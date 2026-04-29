@@ -365,19 +365,26 @@ class RadarDaemon:
         sensor = self.sensors[sid]
         self.primary_sensor_id = sid
 
+        logger.info(f"control_start called for {sid}, payload={request_payload}")
+
         restart_required = False
         if request_payload:
             requested_mode = request_payload.get("mode")
             if isinstance(requested_mode, str) and requested_mode in ("velocity", "distance"):
                 current_mode = str(sensor["config"].get("mode", "velocity"))
                 restart_required = requested_mode != current_mode
+                logger.info(f"Mode change: {current_mode} -> {requested_mode}, restart_required={restart_required}")
 
         if request_payload:
             self._apply_runtime_config(sensor, request_payload)
+            logger.info(f"Config after apply: mode={sensor['config'].get('mode')}")
 
         existing = self.measurement_threads.get(sid)
-        if existing is not None and existing.is_alive():
+        thread_alive = existing is not None and existing.is_alive()
+        logger.info(f"Existing thread alive: {thread_alive}")
+        if thread_alive:
             if not restart_required:
+                logger.info(f"{sid} already running in correct mode, returning early")
                 return {"sensor_id": sid, "message": "already running", "mode": sensor["config"].get("mode")}
 
             logger.info(f"Restarting {sid} to apply new mode/config")
