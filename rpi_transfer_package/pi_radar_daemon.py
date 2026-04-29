@@ -403,6 +403,7 @@ class RadarDaemon:
         sensor["stop_requested"] = False
         sensor["started_monotonic"] = time.monotonic()
         sensor["distance_buffer"] = []
+        sensor["error_count"] = 0
         thread = threading.Thread(
             target=self._measurement_loop,
             args=(sid,),
