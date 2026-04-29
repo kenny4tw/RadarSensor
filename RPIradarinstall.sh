@@ -153,15 +153,24 @@ verify_dependencies() {
     print_header "Verifying Installed Dependencies"
     
     source "$VENV_DIR/bin/activate"
-    
-    REQUIRED_PACKAGES=("acconeer" "scipy" "matplotlib" "flask")
-    
-    for package in "${REQUIRED_PACKAGES[@]}"; do
-        if python3 -c "import ${package//-/_}" 2>/dev/null; then
-            VERSION=$(pip show "$package" 2>/dev/null | grep Version | awk '{print $2}')
-            print_success "$package: $VERSION"
+
+    # Format: "import_name:distribution_name"
+    REQUIRED_PACKAGES=(
+        "acconeer:acconeer-exptool"
+        "scipy:scipy"
+        "matplotlib:matplotlib"
+        "flask:flask"
+    )
+
+    for entry in "${REQUIRED_PACKAGES[@]}"; do
+        module_name="${entry%%:*}"
+        dist_name="${entry##*:}"
+
+        if python3 -c "import ${module_name}" 2>/dev/null; then
+            VERSION=$(python3 -c "import importlib.metadata as m; print(m.version('${dist_name}'))" 2>/dev/null || echo "unknown")
+            print_success "${dist_name}: ${VERSION}"
         else
-            print_warning "$package not found (may not be critical)"
+            print_warning "${dist_name} not importable (may not be critical)"
         fi
     done
 }
