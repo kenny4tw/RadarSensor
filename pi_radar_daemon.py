@@ -397,6 +397,8 @@ class RadarDaemon:
             existing.join(timeout=15)
             if existing.is_alive():
                 raise RuntimeError(f"Could not stop existing measurement thread for {sid}")
+            # Give the serial port time to fully release before reconnecting
+            time.sleep(1.5)
 
         sensor["stop_requested"] = False
         sensor["started_monotonic"] = time.monotonic()
@@ -780,6 +782,11 @@ class RadarDaemon:
                 sensor["log_file"].close()
             except Exception as e:
                 logger.error(f"Error closing log file for {sensor_id}: {e}")
+        # Clear stale references so the next thread doesn't accidentally reuse them
+        sensor["app"] = None
+        sensor["detector"] = None
+        sensor["client"] = None
+        sensor["log_file"] = None
     
     def get_status(self) -> Dict[str, Any]:
         """Get current daemon status as JSON."""
