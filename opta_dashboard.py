@@ -277,10 +277,23 @@ HTML_TEMPLATE = """<!doctype html>
       return value == null ? '-' : Number(value).toFixed(digits);
     }
 
+    function syncInputIfNotEditing(inputId, value) {
+      const input = document.getElementById(inputId);
+      if (!input) {
+        return;
+      }
+
+      if (document.activeElement === input) {
+        return;
+      }
+
+      input.value = value;
+    }
+
     async function refreshState() {
       const state = await api('/api/state');
-      document.getElementById('host').value = state.config.host || '';
-      document.getElementById('port').value = state.config.port || 80;
+      syncInputIfNotEditing('host', state.config.host || '');
+      syncInputIfNotEditing('port', state.config.port || 80);
       document.getElementById('qsoll').value = state.control.q_soll_l_s ?? 0;
       document.getElementById('poll-state').textContent = state.last_error ? 'poll error' : 'poll ok';
       document.getElementById('last-poll').textContent = `last poll: ${state.last_poll || '-'}`;
