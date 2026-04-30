@@ -294,7 +294,7 @@ HTML_TEMPLATE = """<!doctype html>
       const state = await api('/api/state');
       syncInputIfNotEditing('host', state.config.host || '');
       syncInputIfNotEditing('port', state.config.port || 80);
-      document.getElementById('qsoll').value = state.control.q_soll_l_s ?? 0;
+      syncInputIfNotEditing('qsoll', state.control.q_soll_l_s ?? 0);
       document.getElementById('poll-state').textContent = state.last_error ? 'poll error' : 'poll ok';
       document.getElementById('last-poll').textContent = `last poll: ${state.last_poll || '-'}`;
       document.getElementById('last-error').textContent = state.last_error || '';
