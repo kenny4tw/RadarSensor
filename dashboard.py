@@ -62,6 +62,7 @@ DEFAULT_CONFIG = {
             "netvar_port": 8000,
             "control_mode": "auto",
             "remote_sensor_id": "sensor1",
+            "enable_logging": True,
             "surface_distance": 1.0,
             "angle": 45.0,
             "hwaas": 16,
@@ -200,6 +201,7 @@ HTML_TEMPLATE = """<!doctype html>
       <tr><td>Netvar Port:</td><td><input id="netvar_port" type="number" value="8000"></td></tr>
     <tr><td>Control Mode:</td><td><select id="control_mode"><option value="auto">auto</option><option value="remote">remote</option><option value="local">local</option></select></td></tr>
     <tr><td>Remote Sensor ID:</td><td><input id="remote_sensor_id" value="sensor1"></td></tr>
+            <tr><td>CSV Logging:</td><td><label><input id="enable_logging" type="checkbox" checked> Write CSV files on sensor host</label></td></tr>
 
       <!-- Velocity-specific parameters -->
       <tr id="velocity-params" style="display:none;">
@@ -330,6 +332,9 @@ HTML_TEMPLATE = """<!doctype html>
         if (el) el.value = sensor[k] ?? '';
       });
 
+            const enableLoggingEl = document.getElementById('enable_logging');
+            if (enableLoggingEl) enableLoggingEl.checked = sensor.enable_logging !== false;
+
       // Fill velocity params
       ['surface_distance','angle','hwaas','sweeps','time_series','lp_coeff','cfar_sensitivity','max_peak_interval','slow_zone'].forEach(k => {
         const el = document.getElementById(k);
@@ -379,6 +384,7 @@ HTML_TEMPLATE = """<!doctype html>
         netvar_port: Number(document.getElementById('netvar_port').value),
                 control_mode: document.getElementById('control_mode').value,
                 remote_sensor_id: document.getElementById('remote_sensor_id').value,
+                enable_logging: document.getElementById('enable_logging').checked,
       };
 
       // Add velocity params
@@ -803,6 +809,7 @@ def _remote_control(sensor: Dict[str, Any], action: str) -> Dict[str, Any]:
 
     if action == "start":
         body["mode"] = sensor.get("mode", "velocity")
+        body["enable_logging"] = bool(sensor.get("enable_logging", True))
 
         for key in [
             "surface_distance", "angle", "hwaas", "sweeps", "time_series",

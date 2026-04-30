@@ -338,6 +338,9 @@ class RadarDaemon:
         if isinstance(mode, str) and mode in ("velocity", "distance"):
             cfg["mode"] = mode
 
+        if "enable_logging" in request_payload:
+            cfg["enable_logging"] = bool(request_payload.get("enable_logging"))
+
         # Flat payload keys from dashboard for velocity mode.
         velocity_keys = [
             "surface_distance", "angle", "hwaas", "sweeps", "time_series",
