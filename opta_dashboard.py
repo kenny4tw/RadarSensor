@@ -170,6 +170,9 @@ HTML_TEMPLATE = """<!doctype html>
       color: var(--warn);
       font-weight: 600;
     }
+    .mode-btn { margin-right: 4px; }
+    .active-mode { background: var(--accent) !important; color: #fff !important; }
+    input[type=range] { padding: 0; border: none; background: none; accent-color: var(--accent); cursor: pointer; }
   </style>
 </head>
 <body>
@@ -206,17 +209,39 @@ HTML_TEMPLATE = """<!doctype html>
       <div class="card">
         <h2>Control</h2>
         <div class="row">
-          <div style="flex:1;min-width:180px;">
-            <label for="qsoll">Qsoll</label>
-            <input id="qsoll" type="number" min="0" max="200" step="0.1" value="0">
+          <button id="btn-manual-q" class="mode-btn active-mode" onclick="setMode('manual_q')">Manual Q</button>
+          <button id="btn-automatic-q" class="mode-btn alt" onclick="setMode('automatic_q')">Automatic Q</button>
+        </div>
+
+        <div id="section-manual-q" style="margin-top:12px;">
+          <label for="manual-k-angle">K Angle (0 – 90°)</label>
+          <div class="row" style="gap:8px;align-items:center;">
+            <input id="manual-k-slider" type="range" min="0" max="90" step="0.5" value="0"
+                   oninput="document.getElementById('manual-k-angle').value=parseFloat(this.value).toFixed(1)"
+                   style="flex:3;">
+            <input id="manual-k-angle" type="number" min="0" max="90" step="0.1" value="0"
+                   oninput="document.getElementById('manual-k-slider').value=this.value"
+                   style="flex:1;min-width:80px;">
+            <span class="unit">°</span>
+          </div>
+          <div class="row" style="margin-top:8px;">
+            <button onclick="applyManualAngle()">Apply Angle</button>
           </div>
         </div>
-        <div class="row">
+
+        <div id="section-automatic-q" style="display:none;margin-top:12px;">
+          <label for="qsoll">Qsoll (0 – 200 l/s)</label>
+          <div class="row">
+            <input id="qsoll" type="number" min="0" max="200" step="0.1" value="0" style="flex:2;">
+            <button onclick="updateQSoll()" style="flex:1;">Apply Qsoll</button>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:12px;">
           <button onclick="setRunning(true)">Start</button>
           <button class="warn" onclick="setRunning(false)">Stop</button>
-          <button class="alt" onclick="updateQSoll()">Apply Qsoll</button>
         </div>
-        <div class="row meta">Current control file: <span id="control-summary">-</span></div>
+        <div class="row meta" style="margin-top:8px;">Mode: <span id="mode-display">-</span> &nbsp;|&nbsp; <span id="control-summary">-</span></div>
       </div>
 
       <div class="card">
@@ -295,6 +320,22 @@ HTML_TEMPLATE = """<!doctype html>
       syncInputIfNotEditing('host', state.config.host || '');
       syncInputIfNotEditing('port', state.config.port || 80);
       syncInputIfNotEditing('qsoll', state.control.q_soll_l_s ?? 0);
+
+      const mode = state.control.control_mode || state.data.control_mode || 'manual_q';
+      const isManual = mode === 'manual_q';
+      document.getElementById('mode-display').textContent = mode;
+      document.getElementById('section-manual-q').style.display = isManual ? '' : 'none';
+      document.getElementById('section-automatic-q').style.display = isManual ? 'none' : '';
+      document.getElementById('btn-manual-q').className = isManual ? 'mode-btn active-mode' : 'mode-btn alt';
+      document.getElementById('btn-automatic-q').className = isManual ? 'mode-btn alt' : 'mode-btn active-mode';
+
+      const angleVal = state.control.manual_k_angle_deg ?? state.data.manual_k_angle_deg ?? 0;
+      syncInputIfNotEditing('manual-k-angle', Number(angleVal).toFixed(1));
+      const angleInput = document.getElementById('manual-k-angle');
+      if (document.activeElement !== angleInput) {
+        document.getElementById('manual-k-slider').value = angleVal;
+      }
+
       document.getElementById('poll-state').textContent = state.last_error ? 'poll error' : 'poll ok';
       document.getElementById('last-poll').textContent = `last poll: ${state.last_poll || '-'}`;
       document.getElementById('last-error').textContent = state.last_error || '';
@@ -303,7 +344,7 @@ HTML_TEMPLATE = """<!doctype html>
       document.getElementById('h-level').textContent = fmt(state.data.h_level_cm, 2);
       document.getElementById('k-angle').textContent = fmt(state.data.k_angle_deg, 2);
       document.getElementById('k-ma').textContent = `K output: ${fmt(state.data.k_output_mA, 3)} mA`;
-      document.getElementById('control-summary').textContent = `running=${state.control.running ?? '-'}, q_soll_l_s=${fmt(state.control.q_soll_l_s, 2)}`;
+      document.getElementById('control-summary').textContent = `running=${state.control.running ?? '-'}, k=${fmt(state.data.k_angle_deg, 1)}°`;
       document.getElementById('data-json').textContent = JSON.stringify(state.data, null, 2);
       document.getElementById('control-json').textContent = JSON.stringify(state.control, null, 2);
 
@@ -342,6 +383,25 @@ HTML_TEMPLATE = """<!doctype html>
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ q_soll_l_s: Number(document.getElementById('qsoll').value) }),
+      });
+      await refreshState();
+    }
+
+    async function setMode(mode) {
+      await api('/api/control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ control_mode: mode }),
+      });
+      await refreshState();
+    }
+
+    async function applyManualAngle() {
+      const angle = Number(document.getElementById('manual-k-angle').value);
+      await api('/api/control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ manual_k_angle_deg: angle }),
       });
       await refreshState();
     }
@@ -506,6 +566,10 @@ def api_control() -> Any:
         forwarded["running"] = bool(payload["running"])
     if "q_soll_l_s" in payload:
         forwarded["q_soll_l_s"] = max(0.0, min(200.0, float(payload["q_soll_l_s"])))
+    if "control_mode" in payload:
+        forwarded["control_mode"] = str(payload["control_mode"])
+    if "manual_k_angle_deg" in payload:
+        forwarded["manual_k_angle_deg"] = max(0.0, min(90.0, float(payload["manual_k_angle_deg"])))
     control_payload = push_control_update(forwarded)
     try:
         poll_opta_once()
