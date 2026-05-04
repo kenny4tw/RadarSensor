@@ -330,10 +330,12 @@ HTML_TEMPLATE = """<!doctype html>
       document.getElementById('btn-automatic-q').className = isManual ? 'mode-btn alt' : 'mode-btn active-mode';
 
       const angleVal = state.control.manual_k_angle_deg ?? state.data.manual_k_angle_deg ?? 0;
-      syncInputIfNotEditing('manual-k-angle', Number(angleVal).toFixed(1));
       const angleInput = document.getElementById('manual-k-angle');
-      if (document.activeElement !== angleInput) {
-        document.getElementById('manual-k-slider').value = angleVal;
+      const angleSlider = document.getElementById('manual-k-slider');
+      const angleBeingEdited = document.activeElement === angleInput || document.activeElement === angleSlider;
+      if (!angleBeingEdited) {
+        angleInput.value = Number(angleVal).toFixed(1);
+        angleSlider.value = angleVal;
       }
 
       document.getElementById('poll-state').textContent = state.last_error ? 'poll error' : 'poll ok';
