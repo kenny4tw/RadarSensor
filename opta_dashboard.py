@@ -373,7 +373,7 @@ HTML_TEMPLATE = """<!doctype html>
       await api('/api/control', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ running, q_soll_l_s: Number(document.getElementById('qsoll').value) }),
+        body: JSON.stringify({ running }),
       });
       await refreshState();
     }
