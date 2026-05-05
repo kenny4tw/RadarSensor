@@ -11,7 +11,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from flask import Flask, jsonify, render_template_string, request
+import re
+from flask import Flask, jsonify, render_template_string, request, send_file
 
 APP = Flask(__name__)
 BASE_DIR = Path(__file__).resolve().parent
@@ -35,6 +36,7 @@ STATE: Dict[str, Any] = {
     "last_poll": None,
     "last_error": None,
     "csv_logging": False,
+    "csv_filename": "",
 }
 
 HTML_TEMPLATE = """<!doctype html>
@@ -247,11 +249,22 @@ HTML_TEMPLATE = """<!doctype html>
       <div class="card">
         <h2>CSV Logging</h2>
         <div class="row">
+          <div style="flex:1;">
+            <label for="csv-suffix">File name suffix</label>
+            <input id="csv-suffix" type="text" placeholder="e.g. measurement1" value="">
+          </div>
+        </div>
+        <div class="row" style="margin-top:8px;">
           <button onclick="setCsvLogging(true)">Start CSV</button>
           <button class="warn" onclick="setCsvLogging(false)">Stop CSV</button>
         </div>
-        <div class="row meta">Status: <span id="csv-state">stopped</span></div>
-        <div class="row meta">File: opta_json_history.csv</div>
+        <div class="row meta" style="margin-top:6px;">Status: <span id="csv-state">stopped</span></div>
+        <div class="row meta">File: <span id="csv-filename">-</span></div>
+        <div class="row" style="margin-top:8px;" id="csv-download-row" style="display:none;">
+          <a id="csv-download-link" href="/api/download" download>
+            <button class="alt">Download CSV</button>
+          </a>
+        </div>
       </div>
     </div>
 
@@ -342,6 +355,11 @@ HTML_TEMPLATE = """<!doctype html>
       document.getElementById('last-poll').textContent = `last poll: ${state.last_poll || '-'}`;
       document.getElementById('last-error').textContent = state.last_error || '';
       document.getElementById('csv-state').textContent = state.csv_logging ? 'running' : 'stopped';
+      document.getElementById('csv-filename').textContent = state.csv_filename || '-';
+      const dlRow = document.getElementById('csv-download-row');
+      dlRow.style.display = state.csv_filename ? '' : 'none';
+      const dlLink = document.getElementById('csv-download-link');
+      if (state.csv_filename) dlLink.setAttribute('download', state.csv_filename);
       document.getElementById('q-flow').textContent = fmt(state.data.q_flow_l_s, 2);
       document.getElementById('h-level').textContent = fmt(state.data.h_level_cm, 2);
       document.getElementById('k-angle').textContent = fmt(state.data.k_angle_deg, 2);
@@ -409,10 +427,11 @@ HTML_TEMPLATE = """<!doctype html>
     }
 
     async function setCsvLogging(enabled) {
+      const suffix = document.getElementById('csv-suffix').value.trim();
       await api('/api/logging', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled }),
+        body: JSON.stringify({ enabled, suffix }),
       });
       await refreshState();
     }
@@ -457,9 +476,16 @@ def fetch_json(url: str, method: str = "GET", payload: Optional[Dict[str, Any]] 
         return json.loads(response.read().decode("utf-8"))
 
 
+def make_csv_path(filename: str) -> Path:
+    return BASE_DIR / filename
+
+
 def append_csv_snapshot(data_payload: Dict[str, Any], control_payload: Dict[str, Any]) -> None:
-    file_exists = CSV_LOG_PATH.exists()
-    with CSV_LOG_PATH.open("a", newline="", encoding="utf-8") as handle:
+    with STATE_LOCK:
+        csv_filename = STATE.get("csv_filename", "") or CSV_LOG_PATH.name
+    csv_path = make_csv_path(csv_filename)
+    file_exists = csv_path.exists()
+    with csv_path.open("a", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(
             handle,
             fieldnames=[
@@ -586,8 +612,29 @@ def api_logging() -> Any:
     payload = request.get_json(force=True, silent=False) or {}
     enabled = bool(payload.get("enabled"))
     with STATE_LOCK:
+        if enabled and not STATE["csv_logging"]:
+            # Build a new timestamped filename when starting a new session.
+            suffix = str(payload.get("suffix", "")).strip()
+            suffix = re.sub(r"[^\w\-]", "_", suffix)  # sanitize
+            ts = time.strftime("%Y_%m_%d__%H_%M_%S")
+            name = f"{ts}__{suffix}.csv" if suffix else f"{ts}.csv"
+            STATE["csv_filename"] = name
+        elif not enabled:
+            pass  # keep filename so download link stays visible after stop
         STATE["csv_logging"] = enabled
-    return jsonify({"ok": True, "csv_logging": enabled})
+    return jsonify({"ok": True, "csv_logging": enabled, "csv_filename": STATE.get("csv_filename", "")})
+
+
+@APP.route("/api/download", methods=["GET"])
+def api_download() -> Any:
+    with STATE_LOCK:
+        csv_filename = STATE.get("csv_filename", "")
+    if not csv_filename:
+        return jsonify({"ok": False, "error": "no log file"}), 404
+    csv_path = make_csv_path(csv_filename)
+    if not csv_path.exists():
+        return jsonify({"ok": False, "error": "file not found"}), 404
+    return send_file(csv_path, as_attachment=True, download_name=csv_filename, mimetype="text/csv")
 
 
 def bootstrap_state() -> None:
